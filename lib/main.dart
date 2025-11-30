@@ -5,11 +5,25 @@ import 'package:misfits/config/routes/app_router.dart';
 import 'package:misfits/core/theme/app_theme.dart';
 import 'package:misfits/core/theme/theme_controller.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:developer' as developer;
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'firebase_options.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (kDebugMode) {
+    developer.log("Handling a background message: ${message.messageId}");
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Register background handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   await GoogleSignIn.instance.initialize();
 
   runApp(const ProviderScope(child: MyApp()));
