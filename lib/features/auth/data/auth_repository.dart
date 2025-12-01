@@ -42,22 +42,15 @@ class AuthRepository implements IAuthRepository {
         );
       }
 
+      // For authStateChanges, we don't fetch Firestore data here to avoid
+      // unnecessary reads on every auth state change unless explicitly needed.
+      // The _mapFirebaseUser method will use Firebase User data directly.
       return _mapFirebaseUser(user);
     });
   }
 
   @override
   AuthUser? get currentUser => _mapFirebaseUser(_firebaseAuth.currentUser);
-
-  AuthUser? _mapFirebaseUser(User? user) {
-    if (user == null) return null;
-    return AuthUser(
-      id: user.uid,
-      email: user.email ?? '',
-      displayName: user.displayName,
-      photoUrl: user.photoURL,
-    );
-  }
 
   @override
   Future<AuthUser?> signInWithGoogle() async {
@@ -70,42 +63,7 @@ class AuthRepository implements IAuthRepository {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential = await _firebaseAuth
-          .signInWithCredential(credential);
-      final user = userCredential.user;
-
-      if (user != null) {
-        // Save login timestamp
-        await _secureStorage.write(
-          key: _kLastLoginKey,
-          value: DateTime.now().toIso8601String(),
-        );
-
-        // Check if user exists in Firestore
-        final userDocRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid);
-        final userDoc = await userDocRef.get();
-
-        if (!userDoc.exists) {
-          // New user -> Create record
-          await userDocRef.set({
-            'id': user.uid,
-            'email': user.email,
-            'displayName': user.displayName,
-            'photoUrl': user.photoURL,
-            'createdAt': FieldValue.serverTimestamp(),
-            'lastLoginAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          // Existing user -> Update last login
-          await userDocRef.update({
-            'lastLoginAt': FieldValue.serverTimestamp(),
-          });
-        }
-      }
-
-      return _mapFirebaseUser(user);
+      return _signInWithCredential(credential);
     } catch (e) {
       // Handle error (log it, rethrow, etc.)
       print('Error signing in with Google: $e');
@@ -114,10 +72,78 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<AuthUser?> signInWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      return _signInWithCredential(credential);
+    } catch (e) {
+      print('Error signing in with Email/Password: $e');
+      rethrow;
+    }
+  }
+
+  Future<AuthUser?> _signInWithCredential(AuthCredential credential) async {
+    final UserCredential userCredential = await _firebaseAuth
+        .signInWithCredential(credential);
+    final user = userCredential.user;
+
+    if (user != null) {
+      // Save login timestamp
+      await _secureStorage.write(
+        key: _kLastLoginKey,
+        value: DateTime.now().toIso8601String(),
+      );
+
+      // Check if user exists in Firestore
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      final userDoc = await userDocRef.get();
+
+      if (!userDoc.exists) {
+        // New user -> Create record
+        await userDocRef.set({
+          'id': user.uid,
+          'email': user.email,
+          'displayName': user.displayName,
+          'photoUrl': user.photoURL,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        print(userDoc.data());
+        // Existing user -> Update last login
+        await userDocRef.update({'lastLoginAt': FieldValue.serverTimestamp()});
+      }
+    }
+
+    return _mapFirebaseUser(user);
+  }
+
+  @override
   Future<void> signOut() async {
     await _secureStorage.delete(key: _kLastLoginKey);
     await _googleSignIn.signOut();
     await _firebaseAuth.signOut();
+  }
+
+  AuthUser? _mapFirebaseUser(
+    User? user, {
+    Map<String, dynamic>? firestoreData,
+  }) {
+    if (user == null) return null;
+    return AuthUser(
+      id: user.uid,
+      email: user.email ?? '',
+      displayName: firestoreData?['displayName'] as String? ?? user.displayName,
+      photoUrl: firestoreData?['photoUrl'] as String? ?? user.photoURL,
+    );
   }
 }
 
