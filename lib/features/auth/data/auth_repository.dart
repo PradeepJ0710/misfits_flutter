@@ -117,9 +117,9 @@ class AuthRepository implements IAuthRepository {
           'lastLoginAt': FieldValue.serverTimestamp(),
         });
       } else {
-        print(userDoc.data());
         // Existing user -> Update last login
         await userDocRef.update({'lastLoginAt': FieldValue.serverTimestamp()});
+        return _mapFirebaseUser(user, firestoreData: userDoc.data());
       }
     }
 
