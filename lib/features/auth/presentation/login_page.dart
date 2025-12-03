@@ -47,7 +47,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.sports_cricket, size: 100, color: Colors.green),
+              const Icon(Icons.sports_cricket, size: 104, color: Colors.green),
               const SizedBox(height: 32),
               Text(
                 'Misfits',

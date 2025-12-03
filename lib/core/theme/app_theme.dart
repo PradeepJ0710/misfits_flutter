@@ -15,11 +15,23 @@ class AppTheme {
         useM2StyleDividerInM3: true,
         alignedDropdown: true,
         useInputDecoratorThemeInDialogs: true,
+        filledButtonTextStyle: WidgetStatePropertyAll(TextStyle(fontSize: 16)),
+        outlinedButtonTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontSize: 16),
+        ),
       ),
       visualDensity: FlexColorScheme.comfortablePlatformDensity,
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
       fontFamily: GoogleFonts.inter().fontFamily,
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(
+          fontSize: 40,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+          color: Colors.green,
+        ),
+      ),
     );
   }
 
@@ -34,11 +46,23 @@ class AppTheme {
         useM2StyleDividerInM3: true,
         alignedDropdown: true,
         useInputDecoratorThemeInDialogs: true,
+        filledButtonTextStyle: WidgetStatePropertyAll(TextStyle(fontSize: 16)),
+        outlinedButtonTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontSize: 16),
+        ),
       ),
       visualDensity: FlexColorScheme.comfortablePlatformDensity,
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
       fontFamily: GoogleFonts.inter().fontFamily,
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(
+          fontSize: 40,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+          color: Colors.green,
+        ),
+      ),
     );
   }
 }
