@@ -55,3 +55,11 @@ lib/firebase_options.dart
 .firebase/
 .firebase-tools/
 firebase-debug.log
+
+# Android signing keys (VERY IMPORTANT)
+android/key.properties
+android/app/key.properties
+
+# Keystore files
+*.keystore
+*.jks
