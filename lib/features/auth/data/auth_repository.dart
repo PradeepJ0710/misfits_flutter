@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import 'package:misfits/features/auth/domain/auth_user.dart';
 import 'package:misfits/features/auth/domain/i_auth_repository.dart';
 
@@ -42,10 +43,39 @@ class AuthRepository implements IAuthRepository {
         );
       }
 
-      // For authStateChanges, we don't fetch Firestore data here to avoid
-      // unnecessary reads on every auth state change unless explicitly needed.
-      // The _mapFirebaseUser method will use Firebase User data directly.
-      return _mapFirebaseUser(user);
+      // Fetch Firestore data to ensure we have the latest profile info (especially displayName)
+      Map<String, dynamic>? firestoreData;
+      try {
+        final userDocRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid);
+        final userDoc = await userDocRef.get();
+
+        if (!userDoc.exists) {
+          // New user -> Create record
+          await userDocRef.set({
+            'id': user.uid,
+            'email': user.email,
+            'displayName': user.displayName,
+            'photoUrl': user.photoURL,
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastLoginAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // Existing user -> Update last login
+          await userDocRef.update({
+            'lastLoginAt': FieldValue.serverTimestamp(),
+          });
+          firestoreData = userDoc.data();
+        }
+      } catch (e) {
+        // If fetch fails (e.g. offline), we fall back to basic Firebase User data
+        if (kDebugMode) {
+          print('Error fetching/updating user profile from Firestore: $e');
+        }
+      }
+
+      return _mapFirebaseUser(user, firestoreData: firestoreData);
     });
   }
 
@@ -93,36 +123,20 @@ class AuthRepository implements IAuthRepository {
         .signInWithCredential(credential);
     final user = userCredential.user;
 
-    if (user != null) {
-      // Save login timestamp
-      await _secureStorage.write(
-        key: _kLastLoginKey,
-        value: DateTime.now().toIso8601String(),
-      );
+    // If user is null, something went wrong with sign-in, return null.
+    if (user == null) return null;
 
-      // Check if user exists in Firestore
-      final userDocRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid);
-      final userDoc = await userDocRef.get();
+    // Save login timestamp
+    await _secureStorage.write(
+      key: _kLastLoginKey,
+      value: DateTime.now().toIso8601String(),
+    );
 
-      if (!userDoc.exists) {
-        // New user -> Create record
-        await userDocRef.set({
-          'id': user.uid,
-          'email': user.email,
-          'displayName': user.displayName,
-          'photoUrl': user.photoURL,
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastLoginAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Existing user -> Update last login
-        await userDocRef.update({'lastLoginAt': FieldValue.serverTimestamp()});
-        return _mapFirebaseUser(user, firestoreData: userDoc.data());
-      }
-    }
+    // Note: We don't need to fetch/create the user document here because authStateChanges
+    // will pick up the login event and handle the Firestore logic (create/update/fetch).
+    // This avoids redundant reads/writes.
 
+    // We return the basic user here. The stream will emit the full user shortly.
     return _mapFirebaseUser(user);
   }
 
@@ -138,12 +152,19 @@ class AuthRepository implements IAuthRepository {
     Map<String, dynamic>? firestoreData,
   }) {
     if (user == null) return null;
-    return AuthUser(
-      id: user.uid,
-      email: user.email ?? '',
-      displayName: firestoreData?['displayName'] as String? ?? user.displayName,
-      photoUrl: firestoreData?['photoUrl'] as String? ?? user.photoURL,
-    );
+    return firestoreData != null
+        ? AuthUser(
+            id: user.uid,
+            email: user.email ?? '',
+            displayName: firestoreData['displayName'],
+            photoUrl: firestoreData['photoUrl'],
+          )
+        : AuthUser(
+            id: user.uid,
+            email: user.email ?? '',
+            displayName: user.displayName,
+            photoUrl: user.photoURL,
+          );
   }
 }
 

@@ -30,12 +30,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           // Navigate to Home (TODO: Create Home Page)
           // context.go('/home');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Welcome, ${user.displayName ?? user.email}!'),
-            ),
+            SnackBar(content: Text('Welcome, ${user.displayName}!')),
           );
         }
       });
+    });
+
+    // Listen to auth state for errors
+    ref.listen(authControllerProvider, (previous, next) {
+      if (next.hasError && !next.isLoading) {
+        String message = 'An unknown error occurred. Please try again.';
+        final errorStr = next.error.toString();
+
+        if (errorStr.contains('invalid-credential')) {
+          message = 'Invalid email or password.';
+        } else if (errorStr.contains('network-request-failed')) {
+          message = 'No internet connection. Please check your settings.';
+        }
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     });
 
     final authState = ref.watch(authControllerProvider);
@@ -107,17 +123,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       label: const Text('Sign in with Google'),
                     ),
                   ],
-                ),
-
-              if (authState.hasError)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    // 'Error: ${authState.error}',
-                    'Error: Could not login. Please try again.',
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
                 ),
             ],
           ),
